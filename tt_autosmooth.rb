@@ -55,8 +55,9 @@ module TT::Plugins::AutoSmooth
   
   ### VARIABLES ### ------------------------------------------------------------
   
-  @tool_observer ||= nil
   @autosmooth = false
+  
+  @tool_observer ||= nil
 
   # In case the file is reloaded we reset the observer.
   Sketchup.active_model.tools.remove_observer( @tool_observer ) if @tool_observer
@@ -120,11 +121,15 @@ module TT::Plugins::AutoSmooth
   
   # @since 1.0.0
   def self.toggle_autosmooth
-    # (!) Attach AppObserver
+    # (!) Check SketchUp compatibility
     @tool_observer ||= AutoSmoothToolsObserver.new
     @autosmooth = !@autosmooth
     Sketchup.active_model.tools.remove_observer( @tool_observer )
-    Sketchup.active_model.tools.add_observer( @tool_observer ) if @autosmooth
+    # (!) Remove AppObserver
+    if @autosmooth
+      Sketchup.active_model.tools.add_observer( @tool_observer )
+      # (!) Attach AppObserver
+    end
   end
 
 
@@ -215,9 +220,12 @@ module TT::Plugins::AutoSmooth
       end
     end
 
-    # Uses Dynamic Component translation strings.
+    # Uses Dynamic Component translation strings. This is only needed for
+    # SketchUp 8 initial release until M4 (?) when the fourth argument of
+    # Model.start_operation made the current operation transparent instead of
+    # the previous.
     #
-    # (!) Doesn't include "Rotate".
+    # @note Doesn't include "Rotate".
     #
     # @since 1.0.0
     def translate( string_to_translate )
