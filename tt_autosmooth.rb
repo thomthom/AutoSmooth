@@ -61,7 +61,8 @@ module TT::Plugins::AutoSmooth
   @app_observer  ||= nil
   @tool_observer ||= nil
 
-  # In case the file is reloaded we reset the observer.
+  # In case the file is reloaded we reset the observers.
+  Sketchup.remove_observer( @app_observer ) if @app_observer
   Sketchup.active_model.tools.remove_observer( @tool_observer ) if @tool_observer
   
   
