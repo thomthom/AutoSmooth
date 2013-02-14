@@ -56,7 +56,7 @@ module TT::Plugins::AutoSmooth
   ### VARIABLES ### ------------------------------------------------------------
   
   @autosmooth = false
-  
+
   @tool_observer ||= nil
 
   # In case the file is reloaded we reset the observer.
@@ -121,15 +121,23 @@ module TT::Plugins::AutoSmooth
   
   # @since 1.0.0
   def self.toggle_autosmooth
-    # (!) Check SketchUp compatibility
-    @tool_observer ||= AutoSmoothToolsObserver.new
+    model = Sketchup.active_model
+    # Check SketchUp compatibility.
+    if model.method(:start_operation).arity == 1
+      UI.messagebox( "#{PLUGIN_NAME} requires SketchUp 8 or newer." )
+      return false
+    end
+    # Toggle state.
     @autosmooth = !@autosmooth
-    Sketchup.active_model.tools.remove_observer( @tool_observer )
+    # Attache required observers.
+    @tool_observer ||= AutoSmoothToolsObserver.new
+    model.tools.remove_observer( @tool_observer )
     # (!) Remove AppObserver
     if @autosmooth
-      Sketchup.active_model.tools.add_observer( @tool_observer )
+      model.tools.add_observer( @tool_observer )
       # (!) Attach AppObserver
     end
+    true
   end
 
 
