@@ -36,6 +36,7 @@ module TT::Plugins::AutoSmooth
   ### CONSTANTS ### ------------------------------------------------------------
   
   # Plugin information
+  PLUGIN          = self
   PLUGIN_ID       = 'TT_AutoSmooth'.freeze
   PLUGIN_NAME     = 'Auto Smooth'.freeze
   PLUGIN_VERSION  = TT::Version.new(1,0,0).freeze
@@ -57,6 +58,7 @@ module TT::Plugins::AutoSmooth
   
   @autosmooth = false
 
+  @app_observer  ||= nil
   @tool_observer ||= nil
 
   # In case the file is reloaded we reset the observer.
@@ -129,16 +131,47 @@ module TT::Plugins::AutoSmooth
     end
     # Toggle state.
     @autosmooth = !@autosmooth
-    # Attache required observers.
-    @tool_observer ||= AutoSmoothToolsObserver.new
-    model.tools.remove_observer( @tool_observer )
-    # (!) Remove AppObserver
-    if @autosmooth
-      model.tools.add_observer( @tool_observer )
-      # (!) Attach AppObserver
-    end
+    # Attach required observers.
+    self.observe_app
+    self.observe_model( model )
     true
   end
+
+
+  # @since 1.0.0
+  def self.observe_app
+    puts "observe_app: (#{@autosmooth.inspect})"
+    @app_observer ||= AutoSmoothAppObserver.new
+    Sketchup.remove_observer( @app_observer )
+    Sketchup.add_observer( @app_observer ) if @autosmooth
+  end
+
+
+  # @since 1.0.0
+  def self.observe_model( model )
+    puts "observe_model: #{model.guid} (#{@autosmooth.inspect})"
+    @tool_observer ||= AutoSmoothToolsObserver.new
+    model.tools.remove_observer( @tool_observer )
+    model.tools.add_observer( @tool_observer ) if @autosmooth
+  end
+
+
+  # @since 1.0.0
+  class AutoSmoothAppObserver < Sketchup::AppObserver
+
+    # @since 1.0.0
+    def onNewModel( model )
+      puts "onNewModel: #{model.guid}"
+      PLUGIN::observe_model( model )
+    end
+
+    # @since 1.0.0
+    def onOpenModel( model )
+      puts "onOpenModel: #{model.guid}"
+      PLUGIN::observe_model( model )
+    end
+
+  end # class AutoSmoothAppObserver
 
 
   # @since 1.0.0
@@ -241,7 +274,7 @@ module TT::Plugins::AutoSmooth
       @@dc_strings.GetString( string_to_translate )
     end
 
-  end # class
+  end # class AutoSmoothToolsObserver
 
   
   ### DEBUG ### ----------------------------------------------------------------
