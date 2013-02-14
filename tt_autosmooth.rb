@@ -189,6 +189,14 @@ module TT::Plugins::AutoSmooth
       # (!) TODO: Monitor for VCB adjustments when Move tool is active.
       #     VCB adjustments for the Move tool doesn't trigger a state change
       #     like it does with Rotate and Scale.
+      #
+      #     Detect sequence:
+      #     * onTransactionUndo
+      #     * onTransactionStart
+      #     * onTransactionCommit
+      #
+      #     Beware that Undo + Move Action will give same sequence. Include a 
+      #     timeout?
       case tool_id
       when TOOL_ROTATE
         # The rotate tool doesn't trigger a state change when activated, nor
