@@ -52,7 +52,6 @@ module TT::Plugins::AutoSmooth
   TOOL_MOVE   = 21048
   TOOL_ROTATE = 21129
   TOOL_SCALE  = 21236
-  TOOL_ORBIT  = 10508
   
   
   ### VARIABLES ### ------------------------------------------------------------
@@ -83,17 +82,9 @@ module TT::Plugins::AutoSmooth
     cmd.large_icon = File.join( PATH, 'wand.png' )
     cmd_toggle_autosmooth = cmd
 
-
     # Menus
     m = TT.menu( 'Plugins' )
     m.add_item( cmd_toggle_autosmooth )
-    
-    # Context menu
-    #UI.add_context_menu_handler { |context_menu|
-    #  model = Sketchup.active_model
-    #  selection = model.selection
-    #  # ...
-    #}
     
     # Toolbar
     toolbar = UI::Toolbar.new( PLUGIN_NAME )
@@ -142,7 +133,7 @@ module TT::Plugins::AutoSmooth
 
   # @since 1.0.0
   def self.observe_app
-    puts "observe_app: (#{@autosmooth.inspect})"
+    Console.log "observe_app: (#{@autosmooth.inspect})"
     @app_observer ||= AutoSmoothAppObserver.new
     # First reset all observers, then attach if needed.
     Sketchup.remove_observer( @app_observer )
@@ -152,7 +143,7 @@ module TT::Plugins::AutoSmooth
 
   # @since 1.0.0
   def self.observe_model( model )
-    puts "observe_model: #{model.guid} (#{@autosmooth.inspect})"
+    Console.log "observe_model: #{model.guid} (#{@autosmooth.inspect})"
     @tool_observer ||= AutoSmoothToolsObserver.new
     # First reset all observers, then attach if needed.
     @tool_observer.stop_observing_vcb( model )
@@ -166,19 +157,35 @@ module TT::Plugins::AutoSmooth
 
     # @since 1.0.0
     def onNewModel( model )
-      puts "onNewModel: #{model.guid}"
+      Console.log "onNewModel: #{model.guid}"
       PLUGIN::observe_model( model )
     end
 
     # @since 1.0.0
     def onOpenModel( model )
-      puts "onOpenModel: #{model.guid}"
+      Console.log "onOpenModel: #{model.guid}"
       PLUGIN::observe_model( model )
     end
 
   end # class AutoSmoothAppObserver
 
-
+  # Monitor for VCB adjustments when Move tool is active.
+  # 
+  # VCB adjustments for the Move tool doesn't trigger a state change like it
+  # does with Rotate and Scale.
+  #
+  # Detect sequence:
+  # * onTransactionUndo
+  # * onTransactionStart
+  # * {onElementAdded}
+  # * onTransactionCommit
+  #
+  # Move > Undo > Move sequence: (Ignore this.)
+  # * onTransactionUndo
+  # * onToolStateChanged
+  # * onTransactionStart
+  # * onTransactionCommit
+  #
   # @since 1.0.0
   class VCBAdjustmentObserver < Sketchup::ModelObserver
 
@@ -201,7 +208,7 @@ module TT::Plugins::AutoSmooth
     end
 
     def reset
-      puts 'VCBAdjustmentObserver.reset'
+      #Console.log 'VCBAdjustmentObserver.reset'
       @sequence.clear
     end
 
@@ -212,14 +219,14 @@ module TT::Plugins::AutoSmooth
 
     # @since 1.0.0
     def onTransactionCommit( model )
-      puts "onTransactionCommit( #{model} )"
+      #Console.log "onTransactionCommit( #{model} )"
       @sequence << TRANSACTION_COMMIT
-      p @sequence
+      #Console.log @sequence.inspect
       if @sequence[ -3, 3 ] == SEQUENCE
-        puts '> Match'
+        #Console.log '> Match'
         @proc.call
       else
-        puts '> Reset - No Match'
+        #Console.log '> Reset - No Match'
         @sequence.clear
       end
     end
@@ -236,13 +243,13 @@ module TT::Plugins::AutoSmooth
 
     # @since 1.0.0
     def onTransactionStart( model )
-      puts "onTransactionStart( #{model} )"
+      #Console.log "onTransactionStart( #{model} )"
       @sequence << TRANSACTION_START
     end
 
     # @since 1.0.0
     def onTransactionUndo( model )
-      puts "onTransactionUndo( #{model} )"
+      #Console.log "onTransactionUndo( #{model} )"
       @sequence << TRANSACTION_UNDO
     end
 
@@ -265,56 +272,27 @@ module TT::Plugins::AutoSmooth
 
     # @since 1.0.0
     def stop_observing_vcb( model )
-      puts "stop_observing_vcb() - #{@vcb_observer.inspect}"
-      p model.remove_observer( @vcb_observer ) if @vcb_observer
+      Console.log "stop_observing_vcb() - #{@vcb_observer.inspect}"
+      Console.log model.remove_observer( @vcb_observer ).inspect if @vcb_observer
     end
 
     # @since 1.0.0
     def onActiveToolChanged( tools, tool_name, tool_id )
-      puts "onActiveToolChanged: #{tool_name} (#{tool_id})"
+      Console.log "onActiveToolChanged: #{tool_name} (#{tool_id})"
 
-      if @last_tool == tool_id
-        puts '> Reactivated same tool.'
-        return false
-      end
-
-      @last_tool = tool_id
-
-      # (!) TODO: Monitor for VCB adjustments when Move tool is active.
-      #     VCB adjustments for the Move tool doesn't trigger a state change
-      #     like it does with Rotate and Scale.
-      #
-      #     Detect sequence:
-      #     * onTransactionUndo
-      #     * onTransactionStart
-      #     * {onElementAdded}
-      #     * onTransactionCommit
-      #
-      #     Beware that Undo + Move Action will give same sequence. Include a 
-      #     timeout?
-      #
-      #     Move > Undo > Move sequence:
-      #     * onTransactionUndo
-      #     * onToolStateChanged
-      #     * onTransactionStart
-      #     * onTransactionCommit
-      puts '> Remove observer:'
+      Console.log '> Remove observer:'
       stop_observing_vcb( tools.model )
+
       case tool_id
       when TOOL_MOVE
         @vcb_observer = VCBAdjustmentObserver.new {
-          puts 'VCB Change!'
-          # (!)
-
-          #edges = tools.model.active_entities.grep( Sketchup::Edge )
-          #new_edges = edges - @cache
-          #puts "> New Edges: #{new_edges.size}"
+          Console.log 'VCB Change!'
           detect_new_edges( tools, tool_id )
         }
-        puts '> Add observer:'
-        p tools.model.add_observer( @vcb_observer )
+        Console.log '> Add observer:'
+        Console.log tools.model.add_observer( @vcb_observer ).inspect
 
-        puts 'CLEAR CACHE #1'
+        Console.log 'CLEAR CACHE'
         @cache.clear
       when TOOL_ROTATE
         # The rotate tool doesn't trigger a state change when activated, nor
@@ -322,15 +300,14 @@ module TT::Plugins::AutoSmooth
         # of 0 when other tools change to 1.
         @cache = tools.model.active_entities.grep( Sketchup::Edge )
       else
-        puts 'CLEAR CACHE #2'
-        #@cache.clear
+        Console.log 'RESET CACHE'
         @cache = tools.model.active_entities.grep( Sketchup::Edge )
       end
     end
 
     # @since 1.0.0
     def onToolStateChanged( tools, tool_name, tool_id, tool_state )
-      puts "onToolStateChanged: #{tool_name} (#{tool_id}) : #{tool_state}"
+      Console.log "onToolStateChanged: #{tool_name} (#{tool_id}) : #{tool_state}"
       @vcb_observer.reset if @vcb_observer
       case tool_id
       when TOOL_MOVE, TOOL_SCALE
@@ -354,10 +331,10 @@ module TT::Plugins::AutoSmooth
 
     # @since 1.0.0
     def detect_new_edges( tools, tool_id )
-      puts 'detect_new_edges()'
+      Console.log 'detect_new_edges()'
       edges = tools.model.active_entities.grep( Sketchup::Edge )
       new_edges = edges - @cache
-      puts "> New Edges: #{new_edges.size}"
+      Console.log "> New Edges: #{new_edges.size}"
       smooth_edges( new_edges, tool_id, tools.model )
       @cache = edges
       nil
@@ -405,6 +382,25 @@ module TT::Plugins::AutoSmooth
     end
 
   end # class AutoSmoothToolsObserver
+
+
+  # @since 1.0.0
+  module Console
+
+    @system = false # Output to system log.
+    @enabled = true
+
+    # @since 1.0.0
+    def self.log( *args )
+      return false unless @enabled
+      if @system
+        TT.debug *args
+      else
+        puts *args
+      end
+    end
+
+  end # class Console
 
   
   ### DEBUG ### ----------------------------------------------------------------
