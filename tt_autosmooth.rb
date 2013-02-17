@@ -52,6 +52,7 @@ module TT::Plugins::AutoSmooth
   TOOL_MOVE   = 21048
   TOOL_ROTATE = 21129
   TOOL_SCALE  = 21236
+  TOOL_ORBIT  = 10508
   
   
   ### VARIABLES ### ------------------------------------------------------------
@@ -143,6 +144,7 @@ module TT::Plugins::AutoSmooth
   def self.observe_app
     puts "observe_app: (#{@autosmooth.inspect})"
     @app_observer ||= AutoSmoothAppObserver.new
+    # First reset all observers, then attach if needed.
     Sketchup.remove_observer( @app_observer )
     Sketchup.add_observer( @app_observer ) if @autosmooth
   end
@@ -152,6 +154,8 @@ module TT::Plugins::AutoSmooth
   def self.observe_model( model )
     puts "observe_model: #{model.guid} (#{@autosmooth.inspect})"
     @tool_observer ||= AutoSmoothToolsObserver.new
+    # First reset all observers, then attach if needed.
+    @tool_observer.stop_observing_vcb( model )
     model.tools.remove_observer( @tool_observer )
     model.tools.add_observer( @tool_observer ) if @autosmooth
   end
@@ -176,16 +180,106 @@ module TT::Plugins::AutoSmooth
 
 
   # @since 1.0.0
+  class VCBAdjustmentObserver < Sketchup::ModelObserver
+
+    TRANSACTION_ABORT   = 0
+    TRANSACTION_COMMIT  = 1
+    TRANSACTION_EMPTY   = 2
+    TRANSACTION_REDO    = 3
+    TRANSACTION_START   = 4
+    TRANSACTION_UNDO    = 5
+
+    SEQUENCE = [
+      TRANSACTION_UNDO,
+      TRANSACTION_START,
+      TRANSACTION_COMMIT
+    ]
+
+    def initialize( &block )
+      @sequence = []
+      @proc = block
+    end
+
+    def reset
+      puts 'VCBAdjustmentObserver.reset'
+      @sequence.clear
+    end
+
+    # @since 1.0.0
+    def onTransactionAbort( model )
+      @sequence << TRANSACTION_ABORT
+    end
+
+    # @since 1.0.0
+    def onTransactionCommit( model )
+      puts "onTransactionCommit( #{model} )"
+      @sequence << TRANSACTION_COMMIT
+      p @sequence
+      if @sequence[ -3, 3 ] == SEQUENCE
+        puts '> Match'
+        @proc.call
+      else
+        puts '> Reset - No Match'
+        @sequence.clear
+      end
+    end
+
+    # @since 1.0.0
+    def onTransactionEmpty( model )
+      @sequence << TRANSACTION_EMPTY
+    end
+
+    # @since 1.0.0
+    def onTransactionRedo( model )
+      @sequence << TRANSACTION_REDO
+    end
+
+    # @since 1.0.0
+    def onTransactionStart( model )
+      puts "onTransactionStart( #{model} )"
+      @sequence << TRANSACTION_START
+    end
+
+    # @since 1.0.0
+    def onTransactionUndo( model )
+      puts "onTransactionUndo( #{model} )"
+      @sequence << TRANSACTION_UNDO
+    end
+
+    def inspect
+      "#<#{self.class.name}:#{TT.object_id_hex( self )}>"
+    end
+
+  end # class VCBAdjustmentObserver
+
+
+  # @since 1.0.0
   class AutoSmoothToolsObserver < Sketchup::ToolsObserver
 
     # @since 1.0.0
     def initialize
       @cache = []
+      @last_tool = nil
+      @vcb_observer = nil
+    end
+
+    # @since 1.0.0
+    def stop_observing_vcb( model )
+      puts "stop_observing_vcb() - #{@vcb_observer.inspect}"
+      p model.remove_observer( @vcb_observer ) if @vcb_observer
     end
 
     # @since 1.0.0
     def onActiveToolChanged( tools, tool_name, tool_id )
       puts "onActiveToolChanged: #{tool_name} (#{tool_id})"
+
+      if @last_tool == tool_id
+        puts '> Reactivated same tool.'
+        return false
+      end
+
+      @last_tool = tool_id
+
       # (!) TODO: Monitor for VCB adjustments when Move tool is active.
       #     VCB adjustments for the Move tool doesn't trigger a state change
       #     like it does with Rotate and Scale.
@@ -193,24 +287,51 @@ module TT::Plugins::AutoSmooth
       #     Detect sequence:
       #     * onTransactionUndo
       #     * onTransactionStart
+      #     * {onElementAdded}
       #     * onTransactionCommit
       #
       #     Beware that Undo + Move Action will give same sequence. Include a 
       #     timeout?
+      #
+      #     Move > Undo > Move sequence:
+      #     * onTransactionUndo
+      #     * onToolStateChanged
+      #     * onTransactionStart
+      #     * onTransactionCommit
+      puts '> Remove observer:'
+      stop_observing_vcb( tools.model )
       case tool_id
+      when TOOL_MOVE
+        @vcb_observer = VCBAdjustmentObserver.new {
+          puts 'VCB Change!'
+          # (!)
+
+          #edges = tools.model.active_entities.grep( Sketchup::Edge )
+          #new_edges = edges - @cache
+          #puts "> New Edges: #{new_edges.size}"
+          detect_new_edges( tools, tool_id )
+        }
+        puts '> Add observer:'
+        p tools.model.add_observer( @vcb_observer )
+
+        puts 'CLEAR CACHE #1'
+        @cache.clear
       when TOOL_ROTATE
         # The rotate tool doesn't trigger a state change when activated, nor
         # does it change the state to 1. It triggers state change with value
         # of 0 when other tools change to 1.
         @cache = tools.model.active_entities.grep( Sketchup::Edge )
       else
-        @cache.clear
+        puts 'CLEAR CACHE #2'
+        #@cache.clear
+        @cache = tools.model.active_entities.grep( Sketchup::Edge )
       end
     end
 
     # @since 1.0.0
     def onToolStateChanged( tools, tool_name, tool_id, tool_state )
       puts "onToolStateChanged: #{tool_name} (#{tool_id}) : #{tool_state}"
+      @vcb_observer.reset if @vcb_observer
       case tool_id
       when TOOL_MOVE, TOOL_SCALE
         case tool_state
