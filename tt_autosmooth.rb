@@ -428,7 +428,7 @@ module TT::Plugins::AutoSmooth
   module Console
 
     @system = false # Output to system log.
-    @enabled = true
+    @enabled = false
 
     # @since 1.0.0
     def self.log( *args )
