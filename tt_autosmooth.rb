@@ -78,8 +78,8 @@ module TT::Plugins::AutoSmooth
     }
     cmd.status_bar_text = 'Toggle automatic smoothing of auto-folded faces.'
     cmd.tooltip = "Toggle AutoSmooth"
-    cmd.small_icon = File.join( PATH, 'wand.png' )
-    cmd.large_icon = File.join( PATH, 'wand.png' )
+    cmd.small_icon = File.join( PATH, 'AutoSmooth_16.png' )
+    cmd.large_icon = File.join( PATH, 'AutoSmooth_24.png' )
     cmd_toggle_autosmooth = cmd
 
     # Menus
