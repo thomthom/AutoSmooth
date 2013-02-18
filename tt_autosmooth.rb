@@ -174,13 +174,14 @@ module TT::Plugins::AutoSmooth
   # VCB adjustments for the Move tool doesn't trigger a state change like it
   # does with Rotate and Scale.
   #
-  # Detect sequence:
+  # Detect this sequence of events.
+  # Sequence: Move > VCB Adjust
   # * onTransactionUndo
   # * onTransactionStart
-  # * {onElementAdded}
   # * onTransactionCommit
   #
-  # Move > Undo > Move sequence: (Ignore this.)
+  # Ignore this sequence. #reset must be called from onTransactionStart.
+  # Sequence: Move > Undo > Move
   # * onTransactionUndo
   # * onToolStateChanged
   # * onTransactionStart
@@ -266,7 +267,7 @@ module TT::Plugins::AutoSmooth
     # @since 1.0.0
     def initialize
       @cache = []
-      @last_tool = nil
+      @active_tool = nil
       @vcb_observer = nil
     end
 
@@ -279,50 +280,81 @@ module TT::Plugins::AutoSmooth
     # @since 1.0.0
     def onActiveToolChanged( tools, tool_name, tool_id )
       Console.log "onActiveToolChanged: #{tool_name} (#{tool_id})"
+      Console.log "> Active Tool: #{@active_tool.inspect}"
+      Console.log "> Cache size: #{@cache.size}"
 
+      # Keep track of the active tool because state change for a tool might be
+      # triggered before the tool is active. This causes problems in some cases.
+      # If state changes for tools that are not yet active isn't ignored then
+      # edges might incorrectly be smoothed. For instance when a rectangle is
+      # drawn and extruded, when Move, Rotate or Scale is activated the edges
+      # newly create will be smoothed.
+      @active_tool = tool_id
+
+      # Reset the VCB observer if it's activated ensuring it's not active when
+      # it's not needed. Keeping the minimum number of observers active ensures
+      # the best stability and performance.
       Console.log '> Remove observer:'
       stop_observing_vcb( tools.model )
 
       case tool_id
       when TOOL_MOVE
-        @vcb_observer = VCBAdjustmentObserver.new {
+        # Activate observer to detect VCB adjustments for the Move tools as it
+        # doesn't trigger a state change like Rotate and Scale does.
+        @vcb_observer ||= VCBAdjustmentObserver.new {
           Console.log 'VCB Change!'
-          detect_new_edges( tools, tool_id )
+          detect_new_edges( tools.model, tool_id )
         }
         Console.log '> Add observer:'
         Console.log tools.model.add_observer( @vcb_observer ).inspect
 
-        Console.log 'CLEAR CACHE'
+        Console.log 'CLEAR CACHE - MOVE'
         @cache.clear
       when TOOL_ROTATE
         # The rotate tool doesn't trigger a state change when activated, nor
         # does it change the state to 1. It triggers state change with value
         # of 0 when other tools change to 1.
-        @cache = tools.model.active_entities.grep( Sketchup::Edge )
-      else
-        Console.log 'RESET CACHE'
-        @cache = tools.model.active_entities.grep( Sketchup::Edge )
+        cache_edges( tools.model )
+      when TOOL_SCALE
+        #Console.log 'RESET CACHE'
+        #cache_edges( tools.model )
+        Console.log 'CLEAR CACHE - SCALE'
+        @cache.clear
       end
     end
 
     # @since 1.0.0
     def onToolStateChanged( tools, tool_name, tool_id, tool_state )
       Console.log "onToolStateChanged: #{tool_name} (#{tool_id}) : #{tool_state}"
+      Console.log "> Cache size: #{@cache.size}"
+
+      # Reset the VCB observer on state change as these should be no state
+      # changes when the VCB is adjusted for the Move tool
       @vcb_observer.reset if @vcb_observer
+
+      # State changes can occur before the active tool is changed. These must be
+      # ignored in order to prevent incorrect smoothing.
+      if @active_tool != tool_id
+        Console.log '> Ignoring state change!'
+        return false
+      end
+
+      # When the state change is verified to be after the tool is active we can
+      # check for new edges and assume they are a result of AutoFold.
       case tool_id
       when TOOL_MOVE, TOOL_SCALE
         case tool_state
         when 0 # Start / Stop
           return false if @cache.empty?
-          detect_new_edges( tools, tool_id )
+          detect_new_edges( tools.model, tool_id )
         when 1 # Action
-          @cache = tools.model.active_entities.grep( Sketchup::Edge )
+          cache_edges( tools.model )
         end
       when TOOL_ROTATE
         if @cache.empty?
-          @cache = tools.model.active_entities.grep( Sketchup::Edge )
+          cache_edges( tools.model )
         else
-          detect_new_edges( tools, tool_id )
+          detect_new_edges( tools.model, tool_id )
         end
       end
     end
@@ -330,18 +362,23 @@ module TT::Plugins::AutoSmooth
     private
 
     # @since 1.0.0
-    def detect_new_edges( tools, tool_id )
+    def cache_edges( model )
+      @cache = model.active_entities.grep( Sketchup::Edge )
+    end
+
+    # @since 1.0.0
+    def detect_new_edges( model, tool_id )
       Console.log 'detect_new_edges()'
-      edges = tools.model.active_entities.grep( Sketchup::Edge )
+      edges = model.active_entities.grep( Sketchup::Edge )
       new_edges = edges - @cache
       Console.log "> New Edges: #{new_edges.size}"
-      smooth_edges( new_edges, tool_id, tools.model )
+      smooth_edges( model, new_edges, tool_id )
       @cache = edges
       nil
     end
 
     # @since 1.0.0
-    def smooth_edges( edges, tool_id, model )
+    def smooth_edges( model, edges, tool_id )
       return false if edges.empty?
       valid_edges = edges.select { |edge| edge.faces.size == 2 }
       return false if valid_edges.empty?
