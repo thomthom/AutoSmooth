@@ -118,7 +118,7 @@ module TT::Plugins::AutoSmooth
   def self.toggle_autosmooth
     model = Sketchup.active_model
     # Check SketchUp compatibility.
-    if model.method(:start_operation).arity == 1
+    if model.method( :start_operation ).arity == 1
       UI.messagebox( "#{PLUGIN_NAME} requires SketchUp 8 or newer." )
       return false
     end
@@ -271,6 +271,9 @@ module TT::Plugins::AutoSmooth
       @vcb_observer = nil
     end
 
+    # Called when the tool observer is removed, ensuring the VCB observer for
+    # the Move tool is also removed.
+    #
     # @since 1.0.0
     def stop_observing_vcb( model )
       Console.log "stop_observing_vcb() - #{@vcb_observer.inspect}"
@@ -445,7 +448,7 @@ module TT::Plugins::AutoSmooth
   # @note Debug method to reload the plugin.
   #
   # @example
-  #   TT::Plugins::Template.reload
+  #   TT::Plugins::AutoSmooth.reload
   #
   # @param [Boolean] tt_lib Reloads TT_Lib2 if +true+.
   #
