@@ -225,7 +225,7 @@ module TT::Plugins::AutoSmooth
       #Console.log @sequence.inspect
       if @sequence[ -3, 3 ] == SEQUENCE
         #Console.log '> Match'
-        @proc.call
+        @proc.call( model )
       else
         #Console.log '> Reset - No Match'
         @sequence.clear
@@ -286,6 +286,8 @@ module TT::Plugins::AutoSmooth
       Console.log "> Active Tool: #{@active_tool.inspect}"
       Console.log "> Cache size: #{@cache.size}"
 
+      #p 'onActiveToolChanged', tools, tool_name, tool_id unless tools # DEBUG
+
       # Keep track of the active tool because state change for a tool might be
       # triggered before the tool is active. This causes problems in some cases.
       # If state changes for tools that are not yet active isn't ignored then
@@ -304,9 +306,9 @@ module TT::Plugins::AutoSmooth
       when TOOL_MOVE
         # Activate observer to detect VCB adjustments for the Move tools as it
         # doesn't trigger a state change like Rotate and Scale does.
-        @vcb_observer ||= VCBAdjustmentObserver.new {
-          Console.log 'VCB Change!'
-          detect_new_edges( tools.model, tool_id )
+        @vcb_observer ||= VCBAdjustmentObserver.new { |model|
+          Console.log "VCB Change! (#{model.inspect})"
+          detect_new_edges( model, TOOL_MOVE )
         }
         Console.log '> Add observer:'
         Console.log tools.model.add_observer( @vcb_observer ).inspect
