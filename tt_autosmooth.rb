@@ -42,7 +42,7 @@ module TT::Plugins::AutoSmooth
   PLUGIN_VERSION  = TT::Version.new(1,0,0).freeze
   
   # Version information
-  RELEASE_DATE    = '18 Feb 13'.freeze
+  RELEASE_DATE    = '19 Feb 13'.freeze
   
   # Resource paths
   PATH_ROOT   = File.dirname( __FILE__ ).freeze
