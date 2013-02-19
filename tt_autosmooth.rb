@@ -107,7 +107,7 @@ module TT::Plugins::AutoSmooth
       :version => PLUGIN_VERSION.to_s,
       :date => RELEASE_DATE,   
       :description => 'Automatic smoothing of auto-folded faces.',
-      :link_info => 'http://sketchucation.com/forums/viewtopic.php?t=0'
+      :link_info => 'http://sketchucation.com/forums/viewtopic.php?t=50739'
     }
   end
   
