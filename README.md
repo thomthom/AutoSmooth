@@ -19,7 +19,7 @@ Minimum Requirements
 --------------------
 
 * SketchUp 8 (M4 or newer preferred)
-* [TT_Lib² 2.7](https://bitbucket.org/thomthom/tt-library-2/downloads/TT_Lib2%20-%202.7.0.rbz)
+* [TT_Lib² 2.7](https://bitbucket.org/thomthom/tt-library-2/downloads/)
 
 Useful Links
 ------------
