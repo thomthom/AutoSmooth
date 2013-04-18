@@ -23,8 +23,9 @@ module TT
   PLUGIN_VERSION  = '1.1.0'.freeze
   
   # Resource paths
-  PATH_ROOT   = File.dirname( __FILE__ ).freeze
-  PATH        = File.join( PATH_ROOT, 'tt_autosmooth' ).freeze
+  FILENAMESPACE = File.basename( __FILE__, '.rb' )
+  PATH_ROOT     = File.dirname( __FILE__ ).freeze
+  PATH          = File.join( PATH_ROOT, FILENAMESPACE ).freeze
   
   
   ### EXTENSION ### ------------------------------------------------------------
