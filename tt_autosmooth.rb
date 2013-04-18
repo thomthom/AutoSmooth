@@ -20,7 +20,7 @@ module TT
   PLUGIN          = self
   PLUGIN_ID       = 'TT_AutoSmooth'.freeze
   PLUGIN_NAME     = 'Auto Smooth'.freeze
-  PLUGIN_VERSION  = '1.1.0'.freeze
+  PLUGIN_VERSION  = '1.1.1'.freeze
   
   # Resource paths
   FILENAMESPACE = File.basename( __FILE__, '.rb' )
