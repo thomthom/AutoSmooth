@@ -35,19 +35,6 @@ module TT::Plugins::AutoSmooth
   
   
   ### CONSTANTS ### ------------------------------------------------------------
-  
-  # Plugin information
-  PLUGIN          = self
-  PLUGIN_ID       = 'TT_AutoSmooth'.freeze
-  PLUGIN_NAME     = 'Auto Smooth'.freeze
-  PLUGIN_VERSION  = TT::Version.new(1,0,0).freeze
-  
-  # Version information
-  RELEASE_DATE    = '19 Feb 13'.freeze
-  
-  # Resource paths
-  PATH_ROOT   = File.dirname( __FILE__ ).freeze
-  PATH        = File.join( PATH_ROOT, PLUGIN_ID ).freeze
 
   # Tool IDs
   TOOL_MOVE   = 21048
