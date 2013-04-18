@@ -20,7 +20,7 @@ module TT
   PLUGIN          = self
   PLUGIN_ID       = 'TT_AutoSmooth'.freeze
   PLUGIN_NAME     = 'Auto Smooth'.freeze
-  PLUGIN_VERSION  = '1.1.1'.freeze
+  PLUGIN_VERSION  = '1.1.2'.freeze
   
   # Resource paths
   FILENAMESPACE = File.basename( __FILE__, '.rb' )
@@ -35,7 +35,7 @@ module TT
     ex = SketchupExtension.new( PLUGIN_NAME, loader )
     ex.description = 'Automatic smoothing of auto-folded faces.'
     ex.version     = PLUGIN_VERSION
-    ex.copyright   = 'Thomas Thomassen © 2012-2013'
+    ex.copyright   = 'Thomas Thomassen © 2013'
     ex.creator     = 'Thomas Thomassen (thomas@thomthom.net)'
     Sketchup.register_extension( ex, true )
   end
